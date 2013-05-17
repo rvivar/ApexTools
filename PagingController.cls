@@ -18,7 +18,7 @@ public with sharing class PagingController
     {
         get
         {
-            return (this.currentPageNumber - 1) * this.PageSize; 
+            return ((this.currentPageNumber - 1) * this.PageSize); 
         }
     }
     
@@ -110,7 +110,7 @@ public with sharing class PagingController
      */
     public void Last()
     {
-        this.currentPageNumber = this.TotalPages;
+        this.currentPageNumber = this.TotalPages - 1;
         String finalQuery = baseQuery + ' LIMIT ' + String.valueOf(this.PageSize) + ' OFFSET ' + String.valueOf(this.OffsetValue);
         this.RecordsList = Database.query(finalQuery);
     }
