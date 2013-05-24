@@ -4,7 +4,6 @@
 @isTest(SeeAllData=false OnInstall=false)
 private class PagingControllerTest 
 {
-    /** Page size */ 
     private static Integer PAGE_SIZE = 5;
     
     private static void SetupEnvironment()
