@@ -4,7 +4,11 @@
  */
 public with sharing class PagingController
 {
-	/** Stores the base query parameter it should not contain LIMIT and OFFSET clauses */
+    public class IlegalArgumentException extends Exception
+    {
+    
+    }
+    /** Stores the base query parameter it should not contain LIMIT and OFFSET clauses */
     private String baseQuery;
     
     /** Stores the number of the current page */
@@ -59,7 +63,14 @@ public with sharing class PagingController
     {
         get
         {
-            return Integer.valueOf(Math.ceil((this.totalRecords / this.PageSize) + 0.5));
+            if (this.totalRecords > 0)
+            {
+                return Integer.valueOf(Math.ceil((this.totalRecords / this.PageSize) + 0.5));
+            }
+            else
+            {
+                return 0;
+            }
         }
     }
     
@@ -70,11 +81,88 @@ public with sharing class PagingController
      */
     public PagingController(String baseQuery, Integer pageSize)
     {
+        if (pageSize < 0)
+        {
+            throw new IlegalArgumentException('The page size cannot be negative.');
+        }
+        if (baseQuery == null || baseQuery.trim() == '')
+        {
+            throw new IlegalArgumentException('The query cannot be null or empty.');
+        }
         this.baseQuery = baseQuery;
         this.PageSize = pageSize;
-        this.totalRecords = Database.query(baseQuery).size();
+        try
+        {
+            this.totalRecords = Database.query(baseQuery).size();
+        }
+        catch(Exception queryException)
+        {
+            this.totalRecords = 0;
+        }
     }
     
+    /**
+     * Constructor
+     *
+     * @param baseQuery the query that will be used for the paging it SHOULD NOT contains LIMIT and OFFSET clauses
+     */
+    public PagingController(String sobjectName, Set<String> additionalFields, Integer pageSize)
+    {
+        if (pageSize <= 0)
+        {
+            throw new IlegalArgumentException('The page size cannot be negative.');
+        }
+        if (sobjectName == null || sobjectName.trim() == '')
+        {
+            throw new IlegalArgumentException('The SObject name cannot be null or empty.');
+        }
+        if (!Schema.getGlobalDescribe().containsKey(sobjectName))
+        {
+            throw new IlegalArgumentException('The SObject name does not exist.');
+        }
+        String queryFields = this.GetQueryFields(sobjectName, additionalFields);
+        this.baseQuery = 'SELECT ' + queryFields + ' FROM ' + sobjectName;
+        this.PageSize = pageSize;
+        try
+        {
+            this.totalRecords = Database.query(baseQuery).size();
+        }
+        catch(Exception queryException)
+        {
+            this.totalRecords = 0;
+        }
+    }
+    
+    /**
+     * Gets the query fields string according to the additional fields and the SObject describe
+     */
+    private String GetQueryFields(String sobjectName, Set<String> additionalFields)
+    {
+        Map<String, Schema.SObjectField> fieldsMap = Schema.getGlobalDescribe().get(sobjectName).getDescribe().fields.getMap();
+        Schema.DescribeFieldResult fieldDescribe;
+        String queryFields = '';
+        for (Schema.SObjectField field : fieldsMap.values())
+        {
+            fieldDescribe = field.getDescribe();
+            if (fieldDescribe.isAccessible() && fieldDescribe.isCreateable() && fieldDescribe.isUpdateable())
+            {
+                if (queryFields.trim() == '')
+                {
+                    queryFields += String.escapeSingleQuotes(fieldDescribe.getName());
+                }
+                else
+                {
+                    queryFields += ', ' + String.escapeSingleQuotes(fieldDescribe.getName());
+                }
+            }
+        }
+        for (String additionalField : additionalFields)
+        {
+            queryFields += ', '  + String.escapeSingleQuotes(additionalField);
+        }
+        queryFields = String.escapeSingleQuotes(queryFields);
+        return queryFields;
+    }
     /**
      * Sets the records of the first page
      */
